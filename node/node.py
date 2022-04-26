@@ -1,4 +1,5 @@
 
+# node for storage providers
 import os
 import sys
 
@@ -24,7 +25,7 @@ logo = '''
        (_             _)      ||  | \| |__| ___| |__  |__             
         \____________/     ___||___                             
                                                        
-             C  L  O  U  D    S  T  O  R  A  G  E                                              
+       C  L  O  U  D   C  H  A  I  N   S  T  O  R  A  G  E                                              
 			'''
 
 pad = '\n [+] '
@@ -52,12 +53,19 @@ import hmac
 import stat
 import requests
 import uuid
+import os
 
 print(clor.BOLD + clor.BLUE + '\n' + logo + clor.ENDC)
 
+
+try:
+    file_log = open('cloud_block.log', 'r').close()
+except:
+    file_log = open('cloud_block.log', 'w').close()
+
 logging.basicConfig(filename="cloud_block.log",
                     format='%(asctime)s %(message)s',
-                    filemode='w') #change the mode to a+ if file is present
+                    filemode='a+') #change the mode to a+ if file is present
 
 logger = logging.getLogger()
 
@@ -117,6 +125,7 @@ class connect_server():
         self.email = email
         self.host = "127.0.0.1" #0.0.0.0
         self.port = 9226
+        self.ccs_message = b'CCS##-' + bytes.hex(os.urandom(10))
 
         #self.validity = verify_email(self.email).email_check()
 
@@ -136,9 +145,7 @@ class connect_server():
         
     def after_connection(connection):
         self.connection = connection
-        # secret message
-        self.sec_message = b"1000|?~?~?|0001*"
-        self.connection.send(self.sec_message)
+        self.connection.send(self.get_useragent())
         self.sec_recv = self.connection.recv(1024)
 
         # checking the result that comes from the server
@@ -149,10 +156,51 @@ class connect_server():
             self.connection.close()
             print(clor.BOLD + clor.RED + pad + 'Connection cannot be made because of wrong call to the server' + clor.ENDC)
     
-    def ssl_(ssl_connection):
-        self.ssl_connection = ssl_connection
-
+    def dc_creation(message):
+        self.message = message # message should be the user-agnet
+        self.sig = None
+        self.public_key = None
+        try:
+            import ecdsa
+            print(clor.BOLD + pad + 'Creating signature' + clor.ENDC)
+            sk = ecdsa.SigningKey.generate(curve=ecdsa.BRAINPOOLP384r1, hashfunc=hashlib.sha3_384)
+            vk_ = sk.get_verifying_key()
+            sig_ = sk.sign(self.message.encode())
+            self.sig = bytes.hex(sig_)
+            self.public_key = bytes.hex(vk_.to_string())
+            print(clor.BOLD + clor.GREEN + pad + 'Signature is ready' + clor.ENDC)
+        except:
+            print(clor.BOLD + clor.RED + unpad + 'Unable to create signature for verification' + clor.ENDC)
+        if self.sig != None and self.public_key != None:
+            return (self.public_key, self.sig)
+        else:
+            return None
     
+    def dc_verification(public_key, signature, message): # message should be the user-agnet
+        self.public_key = public_key
+        self.signature = signature
+        self.message = message
+        import ecdsa
+        try:
+            vk = ecdsa.VerifyingKey.from_string(bytes.fromhex(public_key), curve=ecdsa.BRAINPOOLP384r1, hashfunc=hashlib.sha3_384) # the default is sha1
+            self.a = vk.verify(bytes.fromhex(sig), self.message.encode())
+        except:
+            self.a = None
+        if a == True:
+            return True
+        elif a == None:
+            print(clor.BOLD + clor.RED + unpad + 'Falied in processing the signature, connection cutting off' + clor.ENDC)
+            return False
+        else:
+            return False
+
+    def get_useragent(self, uuid):
+        self.uuid = uuid
+        self.os_name = os.name
+        self.date_time = time.ctime().replace(' ', ':')
+        self.user_agent = self.ccs_message + b'-' + self.uuid + b'-' + self.os_name, + b'-' + self.date_time
+        return self.user_agent
+
     def store_chunks(self):
         chunk = ''
         
@@ -200,4 +248,3 @@ class combine_all():
             sys.exit()
 
 print('\n')
-connect_server('fd ')
